@@ -12,8 +12,8 @@ export class EmailService {
           port: 587,
           secure: false,
           auth: {
-              user: '你的邮箱地址',
-              pass: '你的授权码'
+              user: '516308181@qq.com',
+              pass: 'zachpvreggnbbjah'
           },
       });
     }
@@ -22,7 +22,7 @@ export class EmailService {
       await this.transporter.sendMail({
         from: {
           name: '会议室预定系统',
-          address: '你的邮箱地址'
+          address: '516308181@qq.com'
         },
         to,
         subject,
