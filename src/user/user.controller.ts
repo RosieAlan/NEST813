@@ -11,12 +11,13 @@ export class UserController {
   async register(@Body() registerUser: RegisterUserDto) {
     return await this.userService.register(registerUser);
   }
+  //使用 @InjectRepository(User) 来注入一个 Repository<User> 实例，进而操作 User 表。
   @Inject(EmailService)
   private emailService: EmailService;
-  
+
   @Inject(RedisService)
   private redisService: RedisService;
-  
+
   @Get('register-captcha')
   async captcha(@Query('address') address: string) {
     const code = Math.random().toString().slice(2, 8);
@@ -29,5 +30,11 @@ export class UserController {
       html: `<p>你的注册验证码是 ${code}</p>`,
     });
     return '发送成功';
+  }
+
+  @Get('init-data')
+  async initData() {
+    await this.userService.initData();
+    return 'done';
   }
 }
