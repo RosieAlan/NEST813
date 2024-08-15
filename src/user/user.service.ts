@@ -1,3 +1,4 @@
+import { ConfigService } from '@nestjs/config';
 import {
   HttpException,
   HttpStatus,
@@ -13,6 +14,9 @@ import { User } from './entities/user.entity';
 import { RedisService } from 'src/redis/redis.service';
 import { Role } from './entities/role.entity';
 import { Permission } from './entities/permission.entity';
+import { LoginUserDto } from './dto/login-user.dto';
+import { LoginUserVo } from './vo/login-user.vo';
+import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class UserService {
@@ -30,8 +34,13 @@ export class UserService {
   @Inject(RedisService)
   private redisService: RedisService;
 
+  @Inject(JwtService)
+  private jwtService: JwtService;
+  @Inject(ConfigService)
+  private configService: ConfigService;
+
   async register(user: RegisterUserDto) {
-      console.log('`captcha_${user.email}`', `captcha_${user.email}`);
+    console.log('`captcha_${user.email}`', `captcha_${user.email}`);
     const captcha = await this.redisService.get(`captcha_${user.email}`);
     console.log('captcha', captcha);
 
@@ -66,20 +75,19 @@ export class UserService {
     }
   }
 
-
   async initData() {
     const user1 = new User();
-    user1.username = "zhangsan";
-    user1.password = md5("111111");
-    user1.email = "xxx@xx.com";
+    user1.username = 'zhangsan';
+    user1.password = md5('111111');
+    user1.email = 'xxx@xx.com';
     user1.isAdmin = true;
     user1.nickName = '张三';
     user1.phoneNumber = '13233323333';
 
     const user2 = new User();
     user2.username = 'lisi';
-    user2.password = md5("222222");
-    user2.email = "yy@yy.com";
+    user2.password = md5('222222');
+    user2.email = 'yy@yy.com';
     user2.nickName = '李四';
 
     const role1 = new Role();
@@ -105,6 +113,94 @@ export class UserService {
     await this.permissionRepository.save([permission1, permission2]);
     await this.roleRepository.save([role1, role2]);
     await this.userRepository.save([user1, user2]);
+  }
+
+  async login(loginUserDto: LoginUserDto, isAdmin: boolean) {
+    const user = await this.userRepository.findOne({
+      where: {
+        username: loginUserDto.username,
+        isAdmin,
+      },
+      relations: ['roles', 'roles.permissions'],
+    });
+
+    if (!user) {
+      throw new HttpException('用户不存在', HttpStatus.BAD_REQUEST);
+    }
+
+    if (user.password !== md5(loginUserDto.password)) {
+      throw new HttpException('密码错误', HttpStatus.BAD_REQUEST);
+    }
+    const vo = new LoginUserVo();
+    console.log('user', user);
+    vo.userInfo = {
+        id: user.id,
+        username: user.username,
+        nickName: user.nickName,
+        email: user.email,
+        phoneNumber: user.phoneNumber,
+        headPic: user.headPic,
+        createTime: user.createTime.getTime(),
+        isFrozen: user.isFrozen,
+        isAdmin: user.isAdmin,
+        roles: user.roles.map(item => item.name),
+        permissions: user.roles.reduce((arr, item) => {
+            item.permissions.forEach(permission => {
+                if(arr.indexOf(permission) === -1) {
+                    arr.push(permission);
+                }
+            })
+            return arr;
+        }, [])
+    }
+    vo.accessToken = this.jwtService.sign(
+      {
+        userId: vo.userInfo.id,
+        username: vo.userInfo.username,
+        roles: vo.userInfo.roles,
+        permissions: vo.userInfo.permissions,
+      },
+      {
+        expiresIn:
+          this.configService.get('jwt_access_token_expires_time') || '30m',
+      },
+    );
+
+    vo.refreshToken = this.jwtService.sign(
+      {
+        userId: vo.userInfo.id,
+      },
+      {
+        expiresIn:
+          this.configService.get('jwt_refresh_token_expres_time') || '7d',
+      },
+    );
+    return vo;
+  }
+
+  async findUserById(userId: number, isAdmin: boolean) {
+    const user =  await this.userRepository.findOne({
+        where: {
+            id: userId,
+            isAdmin
+        },
+        relations: [ 'roles', 'roles.permissions']
+    });
+
+    return {
+        id: user.id,
+        username: user.username,
+        isAdmin: user.isAdmin,
+        roles: user.roles.map(item => item.name),
+        permissions: user.roles.reduce((arr, item) => {
+            item.permissions.forEach(permission => {
+                if(arr.indexOf(permission) === -1) {
+                    arr.push(permission);
+                }
+            })
+            return arr;
+        }, [])
+    }
 }
 
 }
