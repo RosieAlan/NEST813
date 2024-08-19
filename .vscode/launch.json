@@ -1,0 +1,15 @@
+{
+    "name": "Launch via NPM",
+    "request": "launch",
+    "runtimeArgs": [
+        "run-script",
+        "start:dev"
+    ],
+    "console": "integratedTerminal",
+    "runtimeExecutable": "npm",
+    "skipFiles": [
+        "<node_internals>/**"
+    ],
+    "type": "node",
+  
+}
